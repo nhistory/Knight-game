@@ -1,0 +1,278 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using TMPro;
+
+public class BoardManager : MonoBehaviour
+{
+    [Header("Grid Settings")]
+    public int gridWidth = 7;
+    public int gridHeight = 9;
+    public float cellSpacing = 0f; // 박스 사이의 간격 (선택 사항)
+    public Vector2 startOffset = Vector2.zero; // 그리드 시작 위치 오프셋
+
+    [Header("Prefabs")]
+    public GameObject[] boxPrefabs; // 0: White, 1: LightBlue, 2: LightOrange (순서 중요)
+
+    private Box[,] allBoxes; // 그리드 상의 모든 박스를 저장할 2차원 배열
+    private Camera mainCamera;     // mainCamera 변수 선언
+    private float boxSize; 
+
+    [Header("UI")] // UI 관련 변수를 위한 헤더 추가
+    public TextMeshProUGUI tileCountText; // Inspector에서 연결할 TextMeshPro UI 요소
+
+    // Start is called before the first frame update
+    void Start()
+    {
+        mainCamera = Camera.main;
+        allBoxes = new Box[gridWidth, gridHeight];
+
+        if (boxPrefabs == null || boxPrefabs.Length == 0 || boxPrefabs[0] == null)
+        {
+            Debug.LogError("Box prefabs are not assigned or the first prefab is null!");
+            return;
+        }
+        // 첫 번째 프리팹의 스프라이트 크기를 기준으로 boxSize 계산
+        SpriteRenderer sr = boxPrefabs[0].GetComponent<SpriteRenderer>();
+        if (sr == null || sr.sprite == null)
+        {
+            Debug.LogError("First box prefab is missing SpriteRenderer or Sprite!");
+            boxSize = 1f; // 기본값
+        }
+        else
+        {
+            // PPU를 고려한 실제 월드 유닛 크기
+            boxSize = sr.sprite.bounds.size.x;
+        }
+
+
+        AdjustCamera(); // 카메라 먼저 조정
+        SetupBoard();
+        UpdateTileCountUI();
+    }
+
+    void AdjustCamera()
+    {
+        // 그리드의 전체 너비와 높이 (간격 포함)
+        float totalGridPhysicalWidth = gridWidth * boxSize + (gridWidth - 1) * cellSpacing;
+        float totalGridPhysicalHeight = gridHeight * boxSize + (gridHeight - 1) * cellSpacing;
+
+        // 화면 비율에 따라 카메라 Orthographic Size 설정
+        // 여기서는 세로 모드(1179x2556)에서 그리드가 화면 가로 폭에 꽉 차도록 설정하는 것을 목표로 합니다.
+        // 또는 세로 높이에 꽉 차도록 할 수도 있습니다. 요구사항에 따라 기준을 정해야 합니다.
+
+        // 예시: 그리드가 화면 가로 폭에 꽉 차도록 설정
+        mainCamera.orthographicSize = (totalGridPhysicalWidth / mainCamera.aspect) / 2f;
+
+        // 만약 그리드가 화면 세로 높이에 꽉 차도록 하려면:
+        // mainCamera.orthographicSize = totalGridPhysicalHeight / 2f;
+
+        // 카메라 위치: 그리드의 중앙 하단이 (0,0) 근처에 오도록 하거나,
+        // 그리드 전체가 화면 중앙에 오도록 조정
+        float cameraX = (totalGridPhysicalWidth - boxSize) / 2f; // 그리드 중앙 X
+        float cameraY = (totalGridPhysicalHeight - boxSize) / 2f; // 그리드 중앙 Y (그리드가 (0,0)에서 시작할 때의 중심)
+
+        // 화면 하단에 그리드의 첫 번째 행이 오도록 하려면 카메라 Y 위치를 조정해야 합니다.
+        // 카메라의 Y 위치는 (화면 높이의 절반 - 그리드 높이의 절반) 만큼 아래로 내려가면 안 되고,
+        // 그리드의 가장 아래쪽이 화면의 특정 y_offset에 오도록 설정해야 합니다.
+
+        // 여기서는 그리드의 중앙이 카메라 뷰의 중앙에 오도록 설정합니다.
+        mainCamera.transform.position = new Vector3(cameraX, cameraY, -10f);
+    }
+
+    void SetupBoard()
+    {
+        for (int x = 0; x < gridWidth; x++)
+        {
+            for (int y = 0; y < gridHeight; y++)
+            {
+                SpawnNewBox(x, y);
+            }
+        }
+    }
+
+    // 그리드 좌표를 월드 좌표로 변환
+    Vector3 GetWorldPosition(int x, int y)
+    {
+        float boxSize = boxPrefabs[0].GetComponent<SpriteRenderer>().bounds.size.x; // 첫 번째 프리팹의 크기를 기준
+        return new Vector3(
+            startOffset.x + x * (boxSize + cellSpacing),
+            startOffset.y + y * (boxSize + cellSpacing),
+            0
+        );
+    }
+
+    // 새 박스 생성 및 배치
+    void SpawnNewBox(int x, int y)
+    {
+        if (allBoxes[x, y] != null) // 이미 박스가 있다면 생성하지 않음
+        {
+            Debug.LogWarning($"Box already exists at ({x},{y})");
+            return;
+        }
+
+        int randomIndex = Random.Range(0, boxPrefabs.Length);
+        GameObject newBoxGO = Instantiate(boxPrefabs[randomIndex], GetWorldPosition(x, y), Quaternion.identity);
+        newBoxGO.transform.SetParent(this.transform); // BoardManager의 자식으로 설정 (정리 목적)
+
+        Box boxScript = newBoxGO.GetComponent<Box>();
+        boxScript.x = x;
+        boxScript.y = y;
+        // boxScript.boxColor는 프리팹에 이미 설정되어 있어야 함. 또는 여기서 설정 가능
+        // boxScript.boxColor = (BoxColor)randomIndex; // 만약 프리팹에 색상 설정 안했다면
+
+        allBoxes[x, y] = boxScript;
+    }
+
+    // --- 게임 로직 (매치, 파괴, 낙하 등)은 여기에 추가 ---
+    public void ProcessMatches(List<Box> matchedBoxes)
+    {
+        if (matchedBoxes == null || matchedBoxes.Count < 2) // 최소 2개 이상 매치되어야 함 (규칙에 따라 조절)
+        {
+            Debug.Log("Not enough boxes to match or list is null. Minimum 2 required.");
+            return;
+        }
+
+        Debug.Log($"Processing {matchedBoxes.Count} matched boxes.");
+
+        bool madeAMatch = false;
+        foreach (Box box in matchedBoxes)
+        {
+            if (box != null && !box.isMatched)
+            {
+                // 배열 인덱스 범위 확인
+                if (box.x >= 0 && box.x < gridWidth && box.y >= 0 && box.y < gridHeight)
+                {
+                    if (allBoxes[box.x, box.y] == box) // 배열에 있는 박스와 현재 박스가 동일한지 확인
+                    {
+                        allBoxes[box.x, box.y] = null; // 배열에서 제거
+                        box.DestroyBox();
+                        madeAMatch = true;
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"Box at ({box.x},{box.y}) in array is not the one being matched, or was already null. Current box: {box.name}");
+                    }
+                }
+                else
+                {
+                    Debug.LogError($"Box coordinates ({box.x},{box.y}) are out of bounds for allBoxes array!");
+                }
+            }
+            else if (box == null)
+            {
+                 Debug.LogWarning("A null box was passed in matchedBoxes list.");
+            }
+            else if (box.isMatched)
+            {
+                 Debug.LogWarning($"Box ({box.x},{box.y}) - {box.name} is already matched.");
+            }
+        }
+
+        if (madeAMatch)
+        {
+            // 매치 처리 후 빈 공간 채우기
+            StartCoroutine(FillEmptySpacesAndUpdateUI());
+        }
+        else
+        {
+            Debug.Log("No actual matches were processed...");
+            UpdateTileCountUI(); // 매치가 없었더라도 혹시 모르니 UI 업데이트
+        }
+    }
+
+// FillEmptySpaces 코루틴이 끝난 후 UI를 업데이트하도록 수정
+    private System.Collections.IEnumerator FillEmptySpacesAndUpdateUI()
+    {
+        yield return StartCoroutine(FillEmptySpaces()); // 기존 FillEmptySpaces 코루틴 실행 기다림
+        UpdateTileCountUI(); // FillEmptySpaces 완료 후 UI 업데이트
+    }
+
+
+    // 각 색상별 타일 개수를 계산하고 UI를 업데이트하는 함수
+    public void UpdateTileCountUI()
+    {
+        if (tileCountText == null)
+        {
+            Debug.LogWarning("TileCountText is not assigned in BoardManager.");
+            return;
+        }
+
+        int whiteCount = 0;
+        int blueCount = 0;
+        int orangeCount = 0;
+
+        // allBoxes 배열을 순회하며 각 색상별 개수 카운트
+        for (int x = 0; x < gridWidth; x++)
+        {
+            for (int y = 0; y < gridHeight; y++)
+            {
+                if (allBoxes[x, y] != null) // 해당 셀에 박스가 존재하면
+                {
+                    switch (allBoxes[x, y].boxColor)
+                    {
+                        case BoxColor.White:
+                            whiteCount++;
+                            break;
+                        case BoxColor.LightBlue:
+                            blueCount++;
+                            break;
+                        case BoxColor.LightOrange:
+                            orangeCount++;
+                            break;
+                    }
+                }
+            }
+        }
+
+        // UI 텍스트 업데이트
+        tileCountText.text = $"White: {whiteCount}  Blue: {blueCount}  Orange: {orangeCount}";
+    }
+
+    private System.Collections.IEnumerator FillEmptySpaces()
+    {
+        yield return new WaitForSeconds(0.2f); // 박스 파괴 애니메이션 시간 등 고려
+
+        // 1. 위에 있는 박스들 아래로 내리기 (낙하)
+        for (int x = 0; x < gridWidth; x++)
+        {
+            int emptySpacesInColumn = 0;
+            for (int y = 0; y < gridHeight; y++) // 아래에서부터 위로 스캔
+            {
+                if (allBoxes[x, y] == null)
+                {
+                    emptySpacesInColumn++;
+                }
+                else if (emptySpacesInColumn > 0) // 위에 박스가 있고 아래에 빈 공간이 있다면
+                {
+                    Box boxToMove = allBoxes[x, y];
+                    allBoxes[x, y - emptySpacesInColumn] = boxToMove; // 배열상 위치 이동
+                    allBoxes[x, y] = null; // 이전 위치는 비움
+
+                    boxToMove.y = y - emptySpacesInColumn; // 박스의 y 좌표 업데이트
+                    boxToMove.MoveTo(GetWorldPosition(x, boxToMove.y), 0.3f); // 새 위치로 이동
+                }
+            }
+        }
+
+        yield return new WaitForSeconds(0.4f); // 낙하 애니메이션 시간 등 고려
+
+        // 2. 최상단 빈 공간에 새 박스 생성
+        for (int x = 0; x < gridWidth; x++)
+        {
+            for (int y = 0; y < gridHeight; y++)
+            {
+                if (allBoxes[x, y] == null)
+                {
+                    SpawnNewBox(x, y);
+                    // TODO: 새로 생성된 박스도 떨어지는 애니메이션 추가 가능
+                    Box newBox = allBoxes[x, y];
+                    Vector3 startPos = GetWorldPosition(x, gridHeight); // 화면 위에서 떨어지는 것처럼
+                    newBox.transform.position = startPos;
+                    newBox.MoveTo(GetWorldPosition(x, y), 0.3f);
+                }
+            }
+        }
+        // TODO: 매치 가능한 상태인지 다시 확인하는 로직 (Shuffle 등)
+    }
+}
