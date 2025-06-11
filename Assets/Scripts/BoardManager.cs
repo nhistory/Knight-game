@@ -13,6 +13,10 @@ public class BoardManager : MonoBehaviour
 
     [Header("Prefabs")]
     public GameObject[] boxPrefabs; // 0: White, 1: LightBlue, 2: LightOrange (순서 중요)
+    public GameObject knightPrefab;
+
+    [Header("Player Settings")]
+    public Vector2Int knightStartPosition = new Vector2Int(3, 1);
 
     private Box[,] allBoxes; // 그리드 상의 모든 박스를 저장할 2차원 배열
     private Camera mainCamera;     // mainCamera 변수 선언
@@ -86,7 +90,15 @@ public class BoardManager : MonoBehaviour
         {
             for (int y = 0; y < gridHeight; y++)
             {
-                SpawnNewBox(x, y);
+                // 현재 좌표가 기사 시작 위치와 같다면 기사를 생성
+                if (x == knightStartPosition.x && y == knightStartPosition.y)
+                {
+                    SpawnKnight(x, y);
+                }
+                else // 그 외의 모든 위치에는 랜덤 박스를 생성
+                {
+                    SpawnNewBox(x, y);
+                }
             }
         }
     }
@@ -100,6 +112,34 @@ public class BoardManager : MonoBehaviour
             startOffset.y + y * (boxSize + cellSpacing),
             0
         );
+    }
+
+    // 기사 생성 및 배치
+    void SpawnKnight(int x, int y)
+    {
+        if (knightPrefab == null)
+        {
+            Debug.LogError("Knight Prefab is not assigned in BoardManager!");
+            return;
+        }
+
+        GameObject knightGO = Instantiate(knightPrefab, GetWorldPosition(x, y), Quaternion.identity);
+        knightGO.transform.SetParent(this.transform);
+
+        Box boxScript = knightGO.GetComponent<Box>();
+        if (boxScript != null)
+        {
+            boxScript.x = x;
+            boxScript.y = y;
+            // 필요하다면 기사 타일의 색상을 특별하게 지정할 수 있습니다.
+            // boxScript.boxColor = BoxColor.Knight; // (BoxColor Enum에 Knight 추가 필요)
+            boxScript.isKnight = true;
+            allBoxes[x, y] = boxScript;
+        }
+        else
+        {
+            Debug.LogError("Knight Prefab is missing the 'Box' component!");
+        }
     }
 
     // 새 박스 생성 및 배치
@@ -120,7 +160,8 @@ public class BoardManager : MonoBehaviour
         boxScript.y = y;
         // boxScript.boxColor는 프리팹에 이미 설정되어 있어야 함. 또는 여기서 설정 가능
         // boxScript.boxColor = (BoxColor)randomIndex; // 만약 프리팹에 색상 설정 안했다면
-
+        
+        boxScript.isKnight = false; // 일반 박스는 기사가 아님을 확실히 설정
         allBoxes[x, y] = boxScript;
     }
 

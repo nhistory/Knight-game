@@ -11,6 +11,7 @@ public class InputManager : MonoBehaviour
 
     private List<Box> selectedBoxes = new List<Box>();
     private BoxColor? currentDragColor = null; // 현재 드래그 중인 색상
+    private bool isKnightDrag = false; // 기사 드래그 여부를 확인하는 변수
 
     [Header("UI")] // UI 관련 변수를 위한 헤더 추가
     public TextMeshProUGUI movesCountText; // Inspector에서 연결할 TextMeshPro UI 요소
@@ -41,11 +42,11 @@ public class InputManager : MonoBehaviour
         {
             HandleTouchStart(Input.mousePosition);
         }
-        else if (Input.GetMouseButton(0) && currentDragColor.HasValue) // 드래그 중
+        else if (Input.GetMouseButton(0) && isKnightDrag) // 드래그 중이고, '기사 드래그' 상태일 때만 HandleTouchDrag를 호출
         {
             HandleTouchDrag(Input.mousePosition);
         }
-        else if (Input.GetMouseButtonUp(0) && selectedBoxes.Count > 0) // 터치 종료 또는 마우스 왼쪽 버튼 뗌
+        else if (Input.GetMouseButtonUp(0) && isKnightDrag)
         {
             HandleTouchEnd();
         }
@@ -59,13 +60,21 @@ public class InputManager : MonoBehaviour
         if (hit.collider != null)
         {
             Box box = hit.collider.GetComponent<Box>();
-            if (box != null && !box.isMatched)
+            if (box != null)
             {
-                selectedBoxes.Add(box);
-                currentDragColor = box.boxColor;
-                HighlightBox(box, true);
-                UpdateMovesCountUI();
+                if (!box.isMatched && box.isKnight) // isKnight가 true일 때만 아래 로그가 찍힙니다.
+                {
+                    Debug.Log("SUCCESS: Knight detected! Setting isKnightDrag to true.");
+                    isKnightDrag = true;
+                    selectedBoxes.Add(box);
+                    HighlightBox(box, true);
+                    UpdateMovesCountUI();
+                }
             }
+        }
+        else
+        {
+            Debug.Log("HandleTouchStart: Clicked on empty space (or wrong layer).");
         }
     }
 
@@ -76,15 +85,39 @@ public class InputManager : MonoBehaviour
         if (hit.collider != null)
         {
             Box box = hit.collider.GetComponent<Box>();
-            if (box != null && box.boxColor == currentDragColor && !selectedBoxes.Contains(box))
+
+            if (box != null && !box.isKnight && !selectedBoxes.Contains(box))
             {
-                // 마지막으로 선택된 박스와 인접한지 확인 (선택사항, 대각선 포함 등 규칙 정하기)
-                if (selectedBoxes.Count > 0 && IsAdjacent(selectedBoxes[selectedBoxes.Count - 1], box))
+                Debug.LogWarning($"Comparing Colors - Hovered Box: {box.boxColor} | Required Drag Color: {currentDragColor}");
+                
+                // 1. 아직 드래그 색상이 정해지지 않았다면 (기사 다음에 오는 첫 타일)
+                if (currentDragColor == null)
                 {
-                    selectedBoxes.Add(box);
-                    // TODO: 박스 선택 시 시각적 피드백
-                    HighlightBox(box, true);
-                    UpdateMovesCountUI();
+                    Box knightBox = selectedBoxes[0];
+                    bool isAdjacent = IsAdjacent(knightBox, box);
+
+                    if (isAdjacent)
+                    {
+                        Debug.Log("SUCCESS: Adding first tile and setting drag color!"); // 5. 성공 로그
+                        currentDragColor = box.boxColor;
+                        selectedBoxes.Add(box);
+                        HighlightBox(box, true);
+                        UpdateMovesCountUI();
+                    }
+                }
+                // 2. 드래그 색상이 이미 정해져 있다면
+                else if (box.boxColor == currentDragColor)
+                {
+                    Box lastBox = selectedBoxes[selectedBoxes.Count - 1];
+                    bool isAdjacent = IsAdjacent(lastBox, box);
+                    Debug.Log($"Checking adjacency to LastBox ({lastBox.x},{lastBox.y}). Target: ({box.x},{box.y}). Is Adjacent: {isAdjacent}");
+
+                    if (isAdjacent)
+                    {
+                        selectedBoxes.Add(box);
+                        HighlightBox(box, true);
+                        UpdateMovesCountUI();
+                    }
                 }
             }
         }
@@ -101,18 +134,21 @@ public class InputManager : MonoBehaviour
         }
 
         // 유효한 매치가 있었는지 (예: 최소 2개 이상 선택) 확인 후 처리
-        if (selectedBoxes.Count >= 2) // 최소 매치 개수 조건 (게임 규칙에 따라 조절)
+        if (isKnightDrag && selectedBoxes.Count >= 2) // 최소 매치 개수 조건 (게임 규칙에 따라 조절)
         {
             if (boardManager != null)
             {
-                boardManager.ProcessMatches(new List<Box>(selectedBoxes));
-                processedMatch = true; // 매치 로직이 호출되었음을 표시
+                // 기사를 제외한 타일 리스트를 생성하여 전달 (기사는 파괴되지 않아야 하므로)
+                List<Box> boxesToMatch = new List<Box>(selectedBoxes);
+                boxesToMatch.RemoveAt(0); // 맨 처음 선택된 기사를 리스트에서 제거
+
+                boardManager.ProcessMatches(boxesToMatch);
+                processedMatch = true;
             }
         }
 
-        // 유효한 드래그 완료(매치 처리 여부와 관계없이, 유효한 선택이 있었다면 턴으로 간주 가능)
-        // 또는, processedMatch가 true일 때만 턴을 증가시킬 수도 있습니다. (게임 규칙에 따라 결정)
-        if (selectedBoxes.Count > 0) // 드래그를 통해 하나라도 선택했었다면 턴으로 간주
+        // processedMatch가 true일 때만 턴을 증가 (게임 규칙에 따라 결정)
+        if (processedMatch) // 매치가 성공했을 때만 턴을 증가
         {
             IncrementTurn();
         }
@@ -135,6 +171,7 @@ public class InputManager : MonoBehaviour
         }
         selectedBoxes.Clear();
         currentDragColor = null;
+        isKnightDrag = false;
         UpdateMovesCountUI(); // 선택 초기화 시 Moves UI 업데이트
     }
 
