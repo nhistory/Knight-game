@@ -11,6 +11,7 @@ public class Box : MonoBehaviour
     public bool isMatched = false;  // 매치되어 사라질 박스인지 여부
 
     public bool isKnight = false; // 이 타일이 기사인지 확인하는 플래그
+    public bool isAnchored = false; // 이 타일이 고정되어 있는지 확인하는 플래그
 
     private SpriteRenderer spriteRenderer;
     private BoardManager board; // BoardManager와 통신하기 위한 참조

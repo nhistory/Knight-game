@@ -54,6 +54,12 @@ public class InputManager : MonoBehaviour
 
     void HandleTouchStart(Vector3 screenPosition)
     {
+        // 새로운 턴이 시작되었으므로, 이전 턴에 고정했던 기사의 앵커를 해제합니다.
+        if (boardManager != null)
+        {
+            boardManager.UnanchorKnight();
+        }
+
         ClearSelection();
         RaycastHit2D hit = Physics2D.Raycast(mainCamera.ScreenToWorldPoint(screenPosition), Vector2.zero, Mathf.Infinity, boxLayer);
 
@@ -88,8 +94,6 @@ public class InputManager : MonoBehaviour
 
             if (box != null && !box.isKnight && !selectedBoxes.Contains(box))
             {
-                Debug.LogWarning($"Comparing Colors - Hovered Box: {box.boxColor} | Required Drag Color: {currentDragColor}");
-                
                 // 1. 아직 드래그 색상이 정해지지 않았다면 (기사 다음에 오는 첫 타일)
                 if (currentDragColor == null)
                 {
@@ -138,10 +142,20 @@ public class InputManager : MonoBehaviour
         {
             if (boardManager != null)
             {
-                // 기사를 제외한 타일 리스트를 생성하여 전달 (기사는 파괴되지 않아야 하므로)
-                List<Box> boxesToMatch = new List<Box>(selectedBoxes);
-                boxesToMatch.RemoveAt(0); // 맨 처음 선택된 기사를 리스트에서 제거
+                // --- 기사 이동 로직 (시작) ---
+                Box knight = selectedBoxes[0];
+                Box destinationTile = selectedBoxes[selectedBoxes.Count - 1];
 
+                // 1. BoardManager에게 기사를 목적지 타일의 좌표로 이동시키라고 명령
+                boardManager.MoveKnightTo(knight, destinationTile.x, destinationTile.y);
+                // --- 기사 이동 로직 (끝) ---
+
+
+                // 2. 기사를 제외한 나머지 타일들을 파괴 목록에 추가
+                List<Box> boxesToMatch = new List<Box>(selectedBoxes);
+                boxesToMatch.RemoveAt(0); // 맨 처음 선택된 기사를 파괴 목록에서 제거
+
+                // 3. 파괴 목록을 BoardManager에 전달
                 boardManager.ProcessMatches(boxesToMatch);
                 processedMatch = true;
             }

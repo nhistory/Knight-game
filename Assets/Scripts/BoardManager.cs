@@ -5,9 +5,11 @@ using TMPro;
 
 public class BoardManager : MonoBehaviour
 {
+    private Box theKnight;
+
     [Header("Grid Settings")]
     public int gridWidth = 7;
-    public int gridHeight = 9;
+    public int gridHeight = 10;
     public float cellSpacing = 0f; // 박스 사이의 간격 (선택 사항)
     public Vector2 startOffset = Vector2.zero; // 그리드 시작 위치 오프셋
 
@@ -20,7 +22,7 @@ public class BoardManager : MonoBehaviour
 
     private Box[,] allBoxes; // 그리드 상의 모든 박스를 저장할 2차원 배열
     private Camera mainCamera;     // mainCamera 변수 선언
-    private float boxSize; 
+    private float boxSize;
 
     [Header("UI")] // UI 관련 변수를 위한 헤더 추가
     public TextMeshProUGUI tileCountText; // Inspector에서 연결할 TextMeshPro UI 요소
@@ -135,6 +137,7 @@ public class BoardManager : MonoBehaviour
             // boxScript.boxColor = BoxColor.Knight; // (BoxColor Enum에 Knight 추가 필요)
             boxScript.isKnight = true;
             allBoxes[x, y] = boxScript;
+            theKnight = boxScript;
         }
         else
         {
@@ -160,7 +163,7 @@ public class BoardManager : MonoBehaviour
         boxScript.y = y;
         // boxScript.boxColor는 프리팹에 이미 설정되어 있어야 함. 또는 여기서 설정 가능
         // boxScript.boxColor = (BoxColor)randomIndex; // 만약 프리팹에 색상 설정 안했다면
-        
+
         boxScript.isKnight = false; // 일반 박스는 기사가 아님을 확실히 설정
         allBoxes[x, y] = boxScript;
     }
@@ -202,11 +205,11 @@ public class BoardManager : MonoBehaviour
             }
             else if (box == null)
             {
-                 Debug.LogWarning("A null box was passed in matchedBoxes list.");
+                Debug.LogWarning("A null box was passed in matchedBoxes list.");
             }
             else if (box.isMatched)
             {
-                 Debug.LogWarning($"Box ({box.x},{box.y}) - {box.name} is already matched.");
+                Debug.LogWarning($"Box ({box.x},{box.y}) - {box.name} is already matched.");
             }
         }
 
@@ -222,7 +225,40 @@ public class BoardManager : MonoBehaviour
         }
     }
 
-// FillEmptySpaces 코루틴이 끝난 후 UI를 업데이트하도록 수정
+    // 기사를 새로운 그리드 위치로 이동시키는 함수
+    public void MoveKnightTo(Box knightToMove, int targetX, int targetY)
+    {
+        // 안전 장치: 전달받은 박스가 실제로 기사인지 확인
+        if (knightToMove == null || !knightToMove.isKnight)
+        {
+            Debug.LogError("MoveKnightTo: Attempted to move a non-knight box.");
+            return;
+        }
+
+        // 1. 기사의 이전 위치를 그리드에서 비웁니다.
+        if (allBoxes[knightToMove.x, knightToMove.y] == knightToMove)
+        {
+            allBoxes[knightToMove.x, knightToMove.y] = null;
+        }
+
+        // 2. 기사의 내부 좌표를 새로운 좌표로 업데이트합니다.
+        knightToMove.x = targetX;
+        knightToMove.y = targetY;
+
+        // 3. 새로운 위치에 기사를 배치합니다.
+        // (이 위치에 있던 타일은 곧 ProcessMatches에 의해 파괴될 것이므로 덮어써도 괜찮습니다.)
+        allBoxes[targetX, targetY] = knightToMove;
+
+        // 4. 기사 오브젝트에게 새로운 월드 좌표로 시각적 이동을 명령합니다.
+        Vector3 targetPos = GetWorldPosition(targetX, targetY);
+        targetPos.z = -1f; // 기사가 항상 위에 보이도록 Z값을 조정합니다.
+        knightToMove.MoveTo(targetPos, 0.3f);
+
+        // 5. 기사를 "앵커"로 설정하여 이번 턴의 낙하에 영향을 받지 않도록 합니다.
+        knightToMove.isAnchored = true;
+    }
+
+    // FillEmptySpaces 코루틴이 끝난 후 UI를 업데이트하도록 수정
     private System.Collections.IEnumerator FillEmptySpacesAndUpdateUI()
     {
         yield return StartCoroutine(FillEmptySpaces()); // 기존 FillEmptySpaces 코루틴 실행 기다림
@@ -287,6 +323,14 @@ public class BoardManager : MonoBehaviour
                 else if (emptySpacesInColumn > 0) // 위에 박스가 있고 아래에 빈 공간이 있다면
                 {
                     Box boxToMove = allBoxes[x, y];
+
+                    // 박스가 앵커 상태라면 이동하지 않음
+                    // (앵커 상태는 낙하 애니메이션에서 제외되도록 함)
+                    if (boxToMove.isAnchored)
+                    {
+                        continue;
+                    }
+
                     allBoxes[x, y - emptySpacesInColumn] = boxToMove; // 배열상 위치 이동
                     allBoxes[x, y] = null; // 이전 위치는 비움
 
@@ -315,5 +359,14 @@ public class BoardManager : MonoBehaviour
             }
         }
         // TODO: 매치 가능한 상태인지 다시 확인하는 로직 (Shuffle 등)
+    }
+    
+    // 다음 턴이 시작될 때 앵커를 해제하는 함수
+    public void UnanchorKnight() // <--- 이 함수 전체를 새로 추가!
+    {
+        if (theKnight != null)
+        {
+            theKnight.isAnchored = false;
+        }
     }
 }
