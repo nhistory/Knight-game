@@ -125,12 +125,15 @@ public class BoardManager : MonoBehaviour
             return;
         }
 
-        GameObject knightGO = Instantiate(knightPrefab, GetWorldPosition(x, y), Quaternion.identity);
+        Vector3 knightPos = GetWorldPosition(x, y);
+        knightPos.z = -1; // 다른 타일들보다 앞에 보이도록 Z 위치 조정
+        GameObject knightGO = Instantiate(knightPrefab, knightPos, Quaternion.identity);
         knightGO.transform.SetParent(this.transform);
 
         Box boxScript = knightGO.GetComponent<Box>();
         if (boxScript != null)
         {
+            boxScript.board = this; // 의존성 주입
             boxScript.x = x;
             boxScript.y = y;
             // 필요하다면 기사 타일의 색상을 특별하게 지정할 수 있습니다.
@@ -159,6 +162,7 @@ public class BoardManager : MonoBehaviour
         newBoxGO.transform.SetParent(this.transform); // BoardManager의 자식으로 설정 (정리 목적)
 
         Box boxScript = newBoxGO.GetComponent<Box>();
+        boxScript.board = this; // 의존성 주입
         boxScript.x = x;
         boxScript.y = y;
         // boxScript.boxColor는 프리팹에 이미 설정되어 있어야 함. 또는 여기서 설정 가능
@@ -267,7 +271,19 @@ public class BoardManager : MonoBehaviour
 
 
     // 각 색상별 타일 개수를 계산하고 UI를 업데이트하는 함수
-    public void UpdateTileCountUI()
+    public void UpdateBoxPosition(Box box, int newX, int newY)
+    {
+        if (allBoxes[box.x, box.y] == box)
+        {
+            allBoxes[box.x, box.y] = null;
+        }
+
+        box.x = newX;
+        box.y = newY;
+        allBoxes[newX, newY] = box;
+    }
+
+    private void UpdateTileCountUI()
     {
         if (tileCountText == null)
         {
@@ -353,8 +369,12 @@ public class BoardManager : MonoBehaviour
                     // TODO: 새로 생성된 박스도 떨어지는 애니메이션 추가 가능
                     Box newBox = allBoxes[x, y];
                     Vector3 startPos = GetWorldPosition(x, gridHeight); // 화면 위에서 떨어지는 것처럼
+                    startPos.z = 0; // Z 위치를 0으로 강제
                     newBox.transform.position = startPos;
-                    newBox.MoveTo(GetWorldPosition(x, y), 0.3f);
+
+                    Vector3 endPos = GetWorldPosition(x, y);
+                    endPos.z = 0; // Z 위치를 0으로 강제
+                    newBox.MoveTo(endPos, 0.3f);
                 }
             }
         }

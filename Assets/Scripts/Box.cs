@@ -9,16 +9,13 @@ public class Box : MonoBehaviour
     public int x;                   // 그리드 상의 x 좌표
     public int y;                   // 그리드 상의 y 좌표
     public bool isMatched = false;  // 매치되어 사라질 박스인지 여부
-
     public bool isKnight = false; // 이 타일이 기사인지 확인하는 플래그
     public bool isAnchored = false; // 이 타일이 고정되어 있는지 확인하는 플래그
 
     private SpriteRenderer spriteRenderer;
-    private BoardManager board; // BoardManager와 통신하기 위한 참조
 
-    // private static bool isDragging = false;
-    // private static List<Box> currentMatchedBoxes;
-    // private static Box dragOrigin = null;
+    [Header("Board Variables")]
+    public BoardManager board; // BoardManager와 통신하기 위한 참조
 
     void Awake()
     {
@@ -31,82 +28,7 @@ public class Box : MonoBehaviour
 
     void Start()
     {
-        // // 씬에 있는 BoardManager 스크립트를 자동으로 찾아 연결합니다.
-        // board = FindObjectOfType<BoardManager>();
-        // if (board == null)
-        // {
-        //     Debug.LogError("BoardManager not found in scene!");
-        // }
     }
-
-    // 마우스를 처음 클릭했을 때 호출됩니다.
-    // private void OnMouseDown()
-    // {
-    //     // 1. 핵심 로직: 이 타일이 기사가 아니면, 아무것도 하지 않고 즉시 함수를 종료합니다.
-    //     if (!isKnight)
-    //     {
-    //         return;
-    //     }
-
-    //     // 2. 기사 타일을 클릭했다면, 드래그를 시작하고 매치 리스트를 새로 만듭니다.
-    //     isDragging = true;
-    //     currentMatchedBoxes = new List<Box>();
-    //     dragOrigin = this; // 드래그 시작 위치를 현재 박스로 설정
-    //     Debug.Log("Drag Started from Knight!");
-    // }
-
-    // // 마우스 버튼을 누른 상태로 자신의 콜라이더 위로 지나갈 때 호출됩니다.
-    // private void OnMouseOver()
-    // {
-    //     // 드래그 중인 상태일 때만 아래 로직을 실행합니다.
-    //     if (isDragging)
-    //     {
-    //         if (this == dragOrigin)
-    //         {
-    //             return;
-    //         }
-    //         // 아직 매치 리스트에 없고, 기사가 아닌 일반 타일일 경우에만 추가합니다.
-    //         if (!currentMatchedBoxes.Contains(this) && !isKnight)
-    //         {
-    //             // TODO: 매치 로직을 더 정교하게 만들 수 있습니다.
-    //             // (예: 같은 색상만, 혹은 인접한 타일만 추가되도록)
-    //             // 지금은 간단하게 드래그하는 모든 일반 타일을 추가합니다.
-
-    //             // 시각적 피드백 (예: 타일을 살짝 크게 만듦)
-    //             transform.localScale = new Vector3(1.1f, 1.1f, 1.1f);
-    //             currentMatchedBoxes.Add(this);
-    //         }
-    //     }
-    // }
-
-    // // 마우스 버튼에서 손을 뗐을 때 (어디서 떼든) 호출됩니다.
-    // private void OnMouseUp()
-    // {
-    //     // 드래그 중이었을 때만 아래 로직을 실행합니다.
-    //     if (isDragging)
-    //     {
-    //         isDragging = false; // 드래그 상태를 종료합니다.
-    //         dragOrigin = null; // 드래그 시작 위치를 초기화합니다.
-            
-    //         // 시각적 피드백을 원래 크기로 되돌립니다.
-    //         if (currentMatchedBoxes != null)
-    //         {
-    //             foreach (Box box in currentMatchedBoxes)
-    //             {
-    //                 if (box != null)
-    //                 {
-    //                     box.transform.localScale = Vector3.one;
-    //                 }
-    //             }
-    //         }
-
-    //         // 매치된 타일이 하나라도 있으면 BoardManager에 처리를 요청합니다.
-    //         if (board != null && currentMatchedBoxes.Count > 0)
-    //         {
-    //             board.ProcessMatches(currentMatchedBoxes);
-    //         }
-    //     }
-    // }
 
 
     // 박스 색상에 따라 스프라이트를 변경하는 함수 (필요하다면)
@@ -138,6 +60,42 @@ public class Box : MonoBehaviour
         Destroy(gameObject, 0.1f); // 0.1초 후에 GameObject를 파괴합니다. (임시적인 딜레이)
     }
 
+
+    // 특정 위치로 이동하는 함수 (낙하 효과)
+    public float moveSpeed = 0.5f; // 기사 이동 속도
+    private Coroutine moveCoroutine; // 현재 진행중인 이동 코루틴 저장
+
+    // InputManager에서 호출할 이동 시작 메서드
+    public Coroutine StartMove(List<Vector3> path, int finalX, int finalY)
+    {
+        if (moveCoroutine != null)
+        {
+            StopCoroutine(moveCoroutine);
+        }
+        moveCoroutine = StartCoroutine(MoveAlongPath(path, finalX, finalY));
+        return moveCoroutine;
+    }
+
+    // 경로를 따라 순차적으로 이동하는 코루틴
+    private IEnumerator MoveAlongPath(List<Vector3> path, int finalX, int finalY)
+    {
+        // 경로의 첫 번째 위치는 기사의 현재 위치이므로, 두 번째부터 따라갑니다.
+        for (int i = 1; i < path.Count; i++)
+        {
+            Vector3 targetPosition = path[i];
+            targetPosition.z = -1; // 기사가 항상 위에 보이도록 Z 위치를 -1로 고정
+
+            while (Vector3.Distance(transform.position, targetPosition) > 0.01f)
+            {
+                transform.position = Vector3.MoveTowards(transform.position, targetPosition, moveSpeed * Time.deltaTime);
+                yield return null; // 다음 프레임까지 대기
+            }
+            transform.position = targetPosition; // 정확한 위치로 보정
+        }
+
+        // 논리적 위치 업데이트는 InputManager에서 처리하므로 여기서 제거합니다.
+        // 이 코루틴은 이제 순수하게 시각적 이동만 담당합니다.
+    }
 
     // 특정 위치로 이동하는 함수 (낙하 효과)
     public void MoveTo(Vector3 targetPosition, float duration)

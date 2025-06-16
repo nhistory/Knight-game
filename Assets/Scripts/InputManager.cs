@@ -48,7 +48,7 @@ public class InputManager : MonoBehaviour
         }
         else if (Input.GetMouseButtonUp(0) && isKnightDrag)
         {
-            HandleTouchEnd();
+            StartCoroutine(HandleTouchEnd());
         }
     }
 
@@ -127,7 +127,7 @@ public class InputManager : MonoBehaviour
         }
     }
 
-    void HandleTouchEnd()
+    IEnumerator HandleTouchEnd()
     {
         bool processedMatch = false; // 실제로 매치가 처리되었는지 확인하는 플래그
 
@@ -142,21 +142,27 @@ public class InputManager : MonoBehaviour
         {
             if (boardManager != null)
             {
-                // --- 기사 이동 로직 (시작) ---
+                // --- 기사 이동 및 타일 파괴 로직 (시작) ---
                 Box knight = selectedBoxes[0];
-                Box destinationTile = selectedBoxes[selectedBoxes.Count - 1];
+                List<Vector3> movementPath = new List<Vector3>();
+                foreach(Box box in selectedBoxes)
+                {
+                    movementPath.Add(box.transform.position);
+                }
 
-                // 1. BoardManager에게 기사를 목적지 타일의 좌표로 이동시키라고 명령
-                boardManager.MoveKnightTo(knight, destinationTile.x, destinationTile.y);
-                // --- 기사 이동 로직 (끝) ---
-
-
-                // 2. 기사를 제외한 나머지 타일들을 파괴 목록에 추가
                 List<Box> boxesToMatch = new List<Box>(selectedBoxes);
-                boxesToMatch.RemoveAt(0); // 맨 처음 선택된 기사를 파괴 목록에서 제거
+                boxesToMatch.RemoveAt(0);
 
-                // 3. 파괴 목록을 BoardManager에 전달
+                // 1. 기사의 시각적 이동 시작하고 끝날 때까지 대기
+                Box finalDestination = selectedBoxes[selectedBoxes.Count - 1];
+                yield return knight.StartMove(movementPath, finalDestination.x, finalDestination.y);
+
+                // 2. 이동 완료 후 타일 파괴
                 boardManager.ProcessMatches(boxesToMatch);
+
+                // 3. 타일 파괴 후 기사의 논리적 위치 업데이트
+                boardManager.UpdateBoxPosition(knight, finalDestination.x, finalDestination.y);
+                // --- 기사 이동 및 타일 파괴 로직 (끝) ---
                 processedMatch = true;
             }
         }
