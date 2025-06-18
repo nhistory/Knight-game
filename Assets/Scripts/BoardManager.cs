@@ -16,9 +16,13 @@ public class BoardManager : MonoBehaviour
     [Header("Prefabs")]
     public GameObject[] boxPrefabs; // 0: White, 1: LightBlue, 2: LightOrange (순서 중요)
     public GameObject knightPrefab;
+    public GameObject enemyPrefab; // Inspector에서 연결할 Enemy 프리팹
 
     [Header("Player Settings")]
     public Vector2Int knightStartPosition = new Vector2Int(3, 1);
+
+    [Header("Enemy Settings")]
+    public Vector2Int enemyStartPosition = new Vector2Int(3, 7); // 적 시작 위치
 
     private Box[,] allBoxes; // 그리드 상의 모든 박스를 저장할 2차원 배열
     private Camera mainCamera;     // mainCamera 변수 선언
@@ -103,6 +107,7 @@ public class BoardManager : MonoBehaviour
                 }
             }
         }
+        SpawnEnemy();
     }
 
     // 그리드 좌표를 월드 좌표로 변환
@@ -170,6 +175,42 @@ public class BoardManager : MonoBehaviour
 
         boxScript.isKnight = false; // 일반 박스는 기사가 아님을 확실히 설정
         allBoxes[x, y] = boxScript;
+    }
+
+    // 적 생성 및 배치
+    void SpawnEnemy()
+    {
+        if (enemyPrefab == null)
+        {
+            Debug.LogError("Enemy Prefab is not assigned in BoardManager!");
+            return;
+        }
+
+        // 1. 적이 올라설 타일을 찾습니다.
+        Box targetTile = allBoxes[enemyStartPosition.x, enemyStartPosition.y];
+        if (targetTile == null)
+        {
+            Debug.LogError($"Cannot spawn enemy. No tile at designated start position ({enemyStartPosition.x}, {enemyStartPosition.y})");
+            return;
+        }
+
+        // 2. 적 오브젝트를 생성하고 위치를 설정합니다.
+        Vector3 enemyPos = targetTile.transform.position;
+        enemyPos.z = -2; // 기사(-1)보다도 앞에 보이도록 Z 위치 조정
+        GameObject enemyGO = Instantiate(enemyPrefab, enemyPos, Quaternion.identity);
+        enemyGO.transform.SetParent(this.transform);
+
+        // 3. 생성된 적과 타일을 서로 연결합니다.
+        Enemy enemyScript = enemyGO.GetComponent<Enemy>();
+        if (enemyScript != null)
+        {
+            enemyScript.Initialize(targetTile); // 적에게 자신이 어느 타일 위에 있는지 알려줌
+            targetTile.enemyOnTop = enemyScript; // 타일에게 자신 위에 어떤 적이 있는지 알려줌
+        }
+        else
+        {
+            Debug.LogError("Enemy Prefab is missing the 'Enemy' component!");
+        }
     }
 
     // --- 게임 로직 (매치, 파괴, 낙하 등)은 여기에 추가 ---

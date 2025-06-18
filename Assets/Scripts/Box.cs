@@ -11,6 +11,7 @@ public class Box : MonoBehaviour
     public bool isMatched = false;  // 매치되어 사라질 박스인지 여부
     public bool isKnight = false; // 이 타일이 기사인지 확인하는 플래그
     public bool isAnchored = false; // 이 타일이 고정되어 있는지 확인하는 플래그
+    public Enemy enemyOnTop = null; // 이 타일 위에 있는 적. 없으면 null.
 
     private SpriteRenderer spriteRenderer;
 
@@ -50,7 +51,7 @@ public class Box : MonoBehaviour
     public void DestroyBox()
     {
         isMatched = true; // 이 플래그를 사용하여 중복 파괴를 방지하거나 다른 로직에 활용할 수 있습니다.
-        Debug.Log($"Destroying Box: {gameObject.name} at ({x},{y}), Color: {boxColor}");
+        // Debug.Log($"Destroying Box: {gameObject.name} at ({x},{y}), Color: {boxColor}");
 
         // TODO: 여기에 파괴 애니메이션을 재생하는 코드를 추가할 수 있습니다.
         // 예: GetComponent<Animator>().SetTrigger("Destroy");
@@ -62,7 +63,7 @@ public class Box : MonoBehaviour
 
 
     // 특정 위치로 이동하는 함수 (낙하 효과)
-    public float moveSpeed = 0.5f; // 기사 이동 속도
+    public float moveSpeed = 10f; // 기사 이동 속도
     private Coroutine moveCoroutine; // 현재 진행중인 이동 코루틴 저장
 
     // InputManager에서 호출할 이동 시작 메서드

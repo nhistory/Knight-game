@@ -102,7 +102,7 @@ public class InputManager : MonoBehaviour
 
                     if (isAdjacent)
                     {
-                        Debug.Log("SUCCESS: Adding first tile and setting drag color!"); // 5. 성공 로그
+                        // Debug.Log("SUCCESS: Adding first tile and setting drag color!"); // 5. 성공 로그
                         currentDragColor = box.boxColor;
                         selectedBoxes.Add(box);
                         HighlightBox(box, true);
@@ -114,7 +114,7 @@ public class InputManager : MonoBehaviour
                 {
                     Box lastBox = selectedBoxes[selectedBoxes.Count - 1];
                     bool isAdjacent = IsAdjacent(lastBox, box);
-                    Debug.Log($"Checking adjacency to LastBox ({lastBox.x},{lastBox.y}). Target: ({box.x},{box.y}). Is Adjacent: {isAdjacent}");
+                    // Debug.Log($"Checking adjacency to LastBox ({lastBox.x},{lastBox.y}). Target: ({box.x},{box.y}). Is Adjacent: {isAdjacent}");
 
                     if (isAdjacent)
                     {
@@ -148,6 +148,20 @@ public class InputManager : MonoBehaviour
                 foreach(Box box in selectedBoxes)
                 {
                     movementPath.Add(box.transform.position);
+                }
+
+                // 데미지 판정 로직: 기사가 지나가는 경로에 적이 있는지 확인
+                for (int i = 1; i < selectedBoxes.Count; i++) // 첫번째는 기사 시작위치이므로 제외
+                {
+                    Box pathTile = selectedBoxes[i];
+                    // 1. 해당 타일 위에 적이 있는지 확인
+                    // 2. 드래그한 타일 색상(currentDragColor)과 적이 서 있는 타일의 색상(pathTile.boxColor)이 같은지 확인
+                    if (pathTile.enemyOnTop != null && currentDragColor == pathTile.boxColor)
+                    {
+                        Debug.Log("Condition met! Damaging the enemy.");
+                        pathTile.enemyOnTop.TakeDamage(1); // 적에게 데미지를 1 준다
+                        // 한 번의 이동에 한 번만 데미지를 주려면 여기서 break;
+                    }
                 }
 
                 List<Box> boxesToMatch = new List<Box>(selectedBoxes);
