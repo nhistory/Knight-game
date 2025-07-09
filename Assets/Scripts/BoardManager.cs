@@ -1,3 +1,4 @@
+// BoardManager.cs
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -180,37 +181,68 @@ public class BoardManager : MonoBehaviour
     // 적 생성 및 배치
     void SpawnEnemy()
     {
+        // ==================== SpawnEnemy 디버깅 시작 ====================
+        Debug.Log("--- SpawnEnemy() 함수가 호출되었습니다. ---");
+
         if (enemyPrefab == null)
         {
-            Debug.LogError("Enemy Prefab is not assigned in BoardManager!");
+            Debug.LogError("Enemy Prefab이 BoardManager에 할당되지 않았습니다! 함수를 중단합니다.");
             return;
         }
 
-        // 1. 적이 올라설 타일을 찾습니다.
+        // 1. 적의 시작 위치 좌표가 무엇인지 확인합니다. (Inspector에 설정된 값)
+        Debug.Log($"Inspector에 설정된 적 시작 위치(enemyStartPosition): ({enemyStartPosition.x}, {enemyStartPosition.y})");
+
+        // 좌표가 그리드 범위를 벗어나는지 확인합니다.
+        if (enemyStartPosition.x < 0 || enemyStartPosition.x >= gridWidth || 
+            enemyStartPosition.y < 0 || enemyStartPosition.y >= gridHeight)
+        {
+            Debug.LogError($"적 시작 위치({enemyStartPosition.x},{enemyStartPosition.y})가 그리드 범위(가로:{gridWidth}, 세로:{gridHeight})를 벗어났습니다!");
+            return;
+        }
+
+        // 2. 해당 좌표에 있는 타일을 찾습니다.
         Box targetTile = allBoxes[enemyStartPosition.x, enemyStartPosition.y];
+
+        // 3. 타일을 제대로 찾았는지 확인합니다.
         if (targetTile == null)
         {
-            Debug.LogError($"Cannot spawn enemy. No tile at designated start position ({enemyStartPosition.x}, {enemyStartPosition.y})");
+            Debug.LogError($"적을 생성하려 했으나, allBoxes[{enemyStartPosition.x}, {enemyStartPosition.y}] 위치에 타일이 없습니다(NULL)! 함수를 중단합니다.");
             return;
         }
+        
+        Debug.Log($"성공적으로 타일을 찾았습니다: Box at ({targetTile.x},{targetTile.y}), 이름: {targetTile.gameObject.name}");
 
-        // 2. 적 오브젝트를 생성하고 위치를 설정합니다.
+        // 4. 적 오브젝트를 생성하고 위치를 설정합니다.
         Vector3 enemyPos = targetTile.transform.position;
-        enemyPos.z = -2; // 기사(-1)보다도 앞에 보이도록 Z 위치 조정
+        enemyPos.z = -2;
         GameObject enemyGO = Instantiate(enemyPrefab, enemyPos, Quaternion.identity);
         enemyGO.transform.SetParent(this.transform);
 
-        // 3. 생성된 적과 타일을 서로 연결합니다.
+        // 5. 생성된 적과 타일을 서로 연결합니다.
         Enemy enemyScript = enemyGO.GetComponent<Enemy>();
         if (enemyScript != null)
         {
-            enemyScript.Initialize(targetTile); // 적에게 자신이 어느 타일 위에 있는지 알려줌
-            targetTile.enemyOnTop = enemyScript; // 타일에게 자신 위에 어떤 적이 있는지 알려줌
+            enemyScript.Initialize(targetTile);
+            
+            targetTile.enemyOnTop = enemyScript;
+            
+            // 6. 연결이 성공했는지 즉시 확인합니다.
+            if (targetTile.enemyOnTop != null)
+            {
+                Debug.Log($"<color=green>성공: targetTile({targetTile.x},{targetTile.y})의 enemyOnTop 변수에 [{enemyScript.gameObject.name}]가 할당되었습니다.</color>");
+            }
+            else
+            {
+                Debug.LogError("치명적 오류: enemyOnTop 변수에 할당을 시도했지만 실패했습니다(여전히 NULL)!");
+            }
         }
         else
         {
-            Debug.LogError("Enemy Prefab is missing the 'Enemy' component!");
+            Debug.LogError("Enemy Prefab에 'Enemy' 컴포넌트(스크립트)가 없습니다!");
         }
+        Debug.Log("--- SpawnEnemy() 함수가 종료되었습니다. ---");
+        // ==================== SpawnEnemy 디버깅 종료 ====================
     }
 
     // --- 게임 로직 (매치, 파괴, 낙하 등)은 여기에 추가 ---
@@ -222,7 +254,7 @@ public class BoardManager : MonoBehaviour
             return;
         }
 
-        Debug.Log($"Processing {matchedBoxes.Count} matched boxes.");
+        // Debug.Log($"Processing {matchedBoxes.Count} matched boxes.");
 
         bool madeAMatch = false;
         foreach (Box box in matchedBoxes)

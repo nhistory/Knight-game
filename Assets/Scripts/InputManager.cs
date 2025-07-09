@@ -1,3 +1,4 @@
+// InputManager.cs
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -70,7 +71,7 @@ public class InputManager : MonoBehaviour
             {
                 if (!box.isMatched && box.isKnight) // isKnight가 true일 때만 아래 로그가 찍힙니다.
                 {
-                    Debug.Log("SUCCESS: Knight detected! Setting isKnightDrag to true.");
+                    // Debug.Log("SUCCESS: Knight detected! Setting isKnightDrag to true.");
                     isKnightDrag = true;
                     selectedBoxes.Add(box);
                     HighlightBox(box, true);
@@ -140,12 +141,34 @@ public class InputManager : MonoBehaviour
         // 유효한 매치가 있었는지 (예: 최소 2개 이상 선택) 확인 후 처리
         if (isKnightDrag && selectedBoxes.Count >= 2) // 최소 매치 개수 조건 (게임 규칙에 따라 조절)
         {
+            Debug.Log("==================== Touch End Debug Start ====================");
+            Debug.Log($"드래그한 타일 개수: {selectedBoxes.Count}개");
+            foreach(var boxInPath in selectedBoxes)
+            {
+                // boxInPath가 null이 아닌지 먼저 확인 (안전장치)
+                if (boxInPath != null)
+                {
+                    // 타일 위에 적이 있는지 확인하고 로그를 남깁니다.
+                    if(boxInPath.enemyOnTop != null)
+                    {
+                        // 적이 있는 경우: 녹색으로 강조해서 출력
+                        Debug.Log($"<color=green>Box at ({boxInPath.x},{boxInPath.y}) 에는 적 [{boxInPath.enemyOnTop.gameObject.name}] 이(가) 있습니다!</color>");
+                    }
+                    else
+                    {
+                        // 적이 없는 경우: 회색으로 출력
+                        Debug.Log($"<color=grey>Box at ({boxInPath.x},{boxInPath.y}) 에는 적이 없습니다.</color>");
+                    }
+                }
+            }
+            Debug.Log("==================== Touch End Debug End ====================");
+
             if (boardManager != null)
             {
                 // --- 기사 이동 및 타일 파괴 로직 (시작) ---
                 Box knight = selectedBoxes[0];
                 List<Vector3> movementPath = new List<Vector3>();
-                foreach(Box box in selectedBoxes)
+                foreach (Box box in selectedBoxes)
                 {
                     movementPath.Add(box.transform.position);
                 }
@@ -156,7 +179,7 @@ public class InputManager : MonoBehaviour
                     Box pathTile = selectedBoxes[i];
                     // 1. 해당 타일 위에 적이 있는지 확인
                     // 2. 드래그한 타일 색상(currentDragColor)과 적이 서 있는 타일의 색상(pathTile.boxColor)이 같은지 확인
-                    if (pathTile.enemyOnTop != null && currentDragColor == pathTile.boxColor)
+                    if (pathTile.enemyOnTop != null)
                     {
                         Debug.Log("Condition met! Damaging the enemy.");
                         pathTile.enemyOnTop.TakeDamage(1); // 적에게 데미지를 1 준다

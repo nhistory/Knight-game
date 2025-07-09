@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 9014636468745752362}
   m_Layer: 0
   m_Name: Knight
-  m_TagString: Untagged
+  m_TagString: Knight
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -103,6 +103,10 @@ MonoBehaviour:
   y: 0
   isMatched: 0
   isKnight: 1
+  isAnchored: 0
+  enemyOnTop: {fileID: 0}
+  board: {fileID: 0}
+  moveSpeed: 0.5
 --- !u!61 &9014636468745752362
 BoxCollider2D:
   m_ObjectHideFlags: 0
